@@ -98,6 +98,177 @@ vector<BigInt> a;
 
 在数据库中一个连接可能是连着的，也有可能已经关闭，这个时候建议加入一个是否已关闭的状态来表示，并且在析构的时候针对不同情况进行不同的处理要好很多。但是这并不意味着关闭连接函数会发生异常，但是我们能保证这不是重复关闭的人为产生的异常了，此时应该直接记录调用失败，try-catch语句少不了的。
 ## Item 9 绝不在构造和析构过程中调用virtual函数
+我们试想一下，在构造函数中调用函数的对象身份是什么？应该是这个对象才对，而不是一个对象的指针。
+
+我们构造或析构父类对象的时候，不可避免地会调用子类的对应函数。而此时如果在构造函数内调用一个virtual函数，那么显然调用的是父类的函数，此时virtual不再virtual。并不是说这绝对不允许使用，而是你可能期望这玩意调用子类的virtual函数，这样就不用传参数过去了。
+
+C++为什么不允许你这么调用？因为在Derived class对象中，调用构造必然会优先调用Base class的，此时调用Derived意味着调用了没有初始化的东西。同理可以解释为什么不在析构函数中调用virtual函数。
+
+解决方法自然也很简单：如果不能从Base往Derived调用，那么可以在Derived把Base需要的参数给传上去：
+```C++
+class Derived: public Base
+{
+    Derived(params): Base(params) {...}
+};
+```
 ## Item 10 令operator=返回一个<i>reference to</i> <b>*this</b>
+对于赋值运算：
+```C++
+x = y = z = 15;
+```
+是显而易见的，实际上这是因为右结合律。
+```C++
+x = (y = (z = 15));
+```
+其中z = 15返回了一个int(15)，这样y才能按照我们希望的得到15的值。
+
+对于其它类型的也很容易知道这个特点，其中最重要的原理是赋值运算operator=返回了这个数，否则无法继续赋值。
+
+但是有一个地方很奇怪：在大多数的C++语法中，operator=返回了一个引用。此时我们来对比一下两段代码：
+```C++
+class Base
+{
+public:
+    int x;
+    Base() : x(0)
+    {
+        cout << "Constructor" << endl;
+    }
+    Base(const Base &a) : x(a.x)
+    {
+        cout << "Copy constructor" << endl;
+    }
+    Base &operator=(const Base &rhs)
+    {
+        cout << "Assign from Base" << endl;
+        x = rhs.x;
+        return *this;
+    }
+    Base &operator=(const int &_x)
+    {
+        cout << "Assign from int" << endl;
+        x = _x;
+        return *this;
+    }
+};
+int main()
+{
+    Base a, b;
+    b = b = a = 15;
+    return 0;
+}
+```
+对应的输出：
+```
+Constructor
+Constructor
+Assign from int
+Assign from Base
+Assign from Base
+```
+和去除引用的版本：
+```C++
+class Base
+{
+public:
+    int x;
+    Base() : x(0)
+    {
+        cout << "Constructor" << endl;
+    }
+    Base(const Base &a) : x(a.x)
+    {
+        cout << "Copy constructor" << endl;
+    }
+    Base &operator=(const Base &rhs)
+    {
+        cout << "Assign from Base" << endl;
+        x = rhs.x;
+        return *this;
+    }
+    Base &operator=(const int &_x)
+    {
+        cout << "Assign from int" << endl;
+        x = _x;
+        return *this;
+    }
+};
+int main()
+{
+    Base a, b;
+    b = b = a = 15;
+    return 0;
+}
+```
+对应的输出：
+```
+Constructor
+Constructor
+Assign from int
+Copy constructor
+Assign from Base
+Copy constructor
+Assign from Base
+Copy constructor
+```
+差别就体现出来了：少了几个copy constructor减少了一定的时间复杂度。
+
+那么综上所述，为什么返回了引用？
++ 对于返回Base而言，我们更希望返回引用，这是为了返回对象本身，而不是一个复制。这在operator+=之类的运算符上体现的更多。
++ 相比于返回对象，返回引用能减少一定的时间复杂度。
 ## Item 11 在operator=中处理"自我赋值"
+说起这个想起了一段这样的swap的代码：
+```C++
+void swap(int &a, int &b)
+{
+    a ^= b;
+    b ^= a;
+    a ^= b;
+}
+```
+写出这样的代码时，一定要注意a=b的情况，有可能这样的情况会让你直接加入彻夜调试大会#滑稽。
+
+那么对于大多数类的copy函数，不得不考虑的是自己和自己拷贝。比如说
+```C++
+class Bitmap {...};
+class Widget {
+    ...
+private:
+    Bitmap *pb;
+    ...
+}
+Widget& Widget::oeprator=(const Widget &rhs)
+{
+    delete pb;
+    pb = new Bitmap(*rhs.pb);
+    return *this;
+}
+```
+如果这玩意发生了自我赋值，那么在删除pb的时候，rhs.pb也指向了不存在的内存地址。除此以外，如果new发生了异常但是delete没有，那么这个Widget的pb将会指向一块被删除的Bitmap。
+
+同时解决这两个问题的方法其实很简单：只有在产生了需要的对象以后才删除之前的对象，之前的过程则保存在另外一个指针上。
+```C++
+Widget& Widget::operator=(const Widget& rhs)
+{
+    Bitmap *before = pb;
+    pb = new Bitmap(*rhs.pb);
+    delete before;
+    return *this;
+}
+```
+除此以外还有copy-and-swap技术，在保证一个没有异常的swap之上可以进行这样写：
+```C++
+Widget& Widget::operator=(Widget rhs)
+{
+    swap(*this, rhs);
+    return *this;
+}
+```
+可以说相当投机取巧，这个函数在传入形参的时候就会复制一份。有的时候不遵循一些建议也可以获得比较好的结果。
+
+这里就可以看出作者比较厉害的地方了：他认为大部分代码都有可能抛出异常，这是其一；其二是他认为程序员（后续接手或者接口二次开发）才是C++的客户，而不是操作软件的用户进行非法操作。往往程序员的不理解才是更大的软件公敌。
 ## Item 12 复制对象时勿忘其每一个成分
+在之前的基础上，似乎这里没有什么可以讲的了，只需要注意：
++ 深拷贝，或者你知道你在干什么（换一个指针接管之类的）
++ 注意Base class和Derived class的调用。
++ 不建议用copy构造函数实现copy assignment，或者反过来。如果有这方面需求，建议用第三个函数同时实现，然后将其private。
