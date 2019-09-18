@@ -6,6 +6,7 @@ p{
 # 构造/析构/赋值运算
 ## Item 5 了解C++默默编写并调用了哪些函数
 ----
+### 默认都定义了啥
 众所周知，如果你不在类中声明某些函数，编译期会自动帮你书写一部分函数，比如说
 ```C++
 class Empty {}
@@ -22,6 +23,7 @@ public:
     Empty& operator=(const Empty &rhs) {...}
 }
 ```
+### 防止自动实现初始化函数
 这个类
 ```C++
 class BigInt
@@ -30,31 +32,33 @@ public:
     BigInt(const int &rhs) {...}
 }
 ```
-不会生成一个无实参构造函数，但是其他的copy构造函数，赋值运算符，和析构函数依旧会生成。如果意图不生成copy赋值函数，那么需要给这个class加入不允许copy的部分（指从实际意义上），比如：
->```C++
->template<class T>
->class NamedObject
->{
->public:
->   NamedObject(std::string &name, const T& value);
->private:
->   std::string &nameValue;
->   const T objectValue;
->};
->std::string newDog("Persephone");
->std::string oldDog("Satch");
->NamedObject p(newDog, 2);
->NamedObject s(oldDog, 36);
->p = s;
->```
+不会生成一个无实参构造函数，但是无法阻止operator=的生成。另外把BigInt丢到private里面也可以达到一样的目的哦（笑）。
+
+### 对于某些要求编译器只能选择自己钻进垃圾箱
+```C++
+template<class T>
+class NamedObject
+{
+public:
+   NamedObject(std::string &name, const T& value);
+private:
+   std::string &nameValue;
+   const T objectValue;
+};
+std::string newDog("Persephone");
+std::string oldDog("Satch");
+NamedObject p(newDog, 2);
+NamedObject s(oldDog, 36);
+p = s;
+```
 看看这段代码会发生什么？编译器：我太难了。
 
-除此以外还有一种情况也不会生成默认函数：private以后的derived calss，因为大多数情况需要调用base class的，但是因为这部分被private了，所以不允许调用。
+除此以外还有一种情况也不会生成默认函数：private以后的derived calss，因为自动生辰大哥需要调用base class的对应构造函数，但是因为这部分被private了，所以不会自动生成。
 ## Item 6 若不想使用编译器自动生成的函数，就该明确拒绝
 ----
 从上一个Item可以看到，private化一个构造函数可以屏蔽掉编译器默认的构造，赋值函数。事实上，private以后如果仅声明但是不定义，那么可以很好的屏蔽掉外部调用。
 
-但是可能还有一个问题，friend和成员函数依旧可以访问。这时有一个比较好的解决办法就是把不希望被所有函数访问到的给包装起来，
+但是可能还有一个问题，friend和member函数依旧可以访问。这时有一个比较好的解决办法就是把不希望被所有函数访问到的给包装起来，
 ```C++
 class UnCopyable
 {
@@ -66,9 +70,10 @@ private:
     Uncopyable &operator=(const Uncopyable &);
 }
 ```
-之后private继承即可，这样自己也无法访问父类定义的那些函数了。
+之后private继承即可，这样friend和member函数也无法访问父类定义的那些函数了。
 ## Item 7 为多态基类声明virtual析构函数
 ----
+### 怎么析构的？
 我们来看一个具体的例子：
 ```C++
 class IPhone
@@ -87,11 +92,13 @@ IPhone* getIPhone(const std::string &iphone) {...}
 ```
 然后这个指针的静态类型就是IPhone，动态类型是不确定的，虽然变化不多。但是这种情况会有一个问题：析构是怎么析构的？
 
+>在这里C++认为：当一个 derived class object（派生类对象）通过使用一个 pointer to a base class with a non-virtual destructor（指向带有非虚拟析构函数的基类的指针）被删除，则结果是未定义的。
+### 怎么解决？
 这里就会产生一个错误：以IPhone的形式析构一个IPhoneX对象（或者其他的同类对象）就会产生析构不完全的问题，造成内存泄露。所以这里需要给析构函数加入一个virtual。你甚至可以把析构函数变成一个pure virtual函数，用以强制要求定义析构函数，比如
 ```C++
     virtual ~IPhone() = 0;
 ```
-但是还是要在外部进行一下定义，否则在真正析构的时候还是要调用到这里的，到时候就是Linker发出抱怨了。
+但是还是要在外部进行一下定义，否则在真正析构的时候还是要调用到这里的，到时候就是Linker开始~~龙门粗口~~抱怨了。
 ## Item 8 别让异常逃离析构函数
 ----
 如果析构函数发生了异常，那么会发生不可预料的后果，举个例子：
@@ -118,6 +125,10 @@ class Derived: public Base
 ```
 ## Item 10 令operator=返回一个<i>reference to</i> <b>*this</b>
 ----
+### 快速看点
++ 对于返回Base而言，我们更希望返回引用，这是为了返回对象本身，而不是一个复制。这在operator+=之类的运算符上体现的更多。
++ 相比于返回对象，返回引用能减少一定的时间复杂度。
+### 举个例子
 对于赋值运算：
 ```C++
 x = y = z = 15;
@@ -218,13 +229,9 @@ Assign from Base
 Copy constructor
 ```
 差别就体现出来了：少了几个copy constructor减少了一定的时间复杂度。
-
-那么综上所述，为什么返回了引用？
-+ 对于返回Base而言，我们更希望返回引用，这是为了返回对象本身，而不是一个复制。这在operator+=之类的运算符上体现的更多。
-+ 相比于返回对象，返回引用能减少一定的时间复杂度。
 ## Item 11 在operator=中处理"自我赋值"
 ----
-说起这个想起了一段这样的swap的代码：
+### 提起自我赋值，我想起了……
 ```C++
 void swap(int &a, int &b)
 {
@@ -234,7 +241,7 @@ void swap(int &a, int &b)
 }
 ```
 写出这样的代码时，一定要注意a=b的情况，有可能这样的情况会让你直接加入彻夜调试大会#滑稽。
-
+### 背后的问题-在原来的地方修改总是让人不放心
 那么对于大多数类的copy函数，不得不考虑的是自己和自己拷贝。比如说
 ```C++
 class Bitmap {...};
@@ -263,6 +270,7 @@ Widget& Widget::operator=(const Widget& rhs)
     return *this;
 }
 ```
+### 你写代码像蔡徐坤
 除此以外还有copy-and-swap技术，在保证一个没有异常的swap之上可以进行这样写：
 ```C++
 Widget& Widget::operator=(Widget rhs)
