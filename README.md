@@ -4,7 +4,9 @@
 基本保证每天更新，更新内容不定，但是保证只要没看完一本书就不会看下一本。
 Base的CSAPP是之前的东西，可以暂时不管。
 
-2019-09-20 Effective-C++ Item26-Item28(not finished)
+2019-09-21 Effective-C++ Item29-Item31(not finished)
+
+2019-09-20 Effective-C++ Item26-Item28(finished)
 
 2019-09-19 Effective-C++ Item22-Item25(finished), modify content
 
