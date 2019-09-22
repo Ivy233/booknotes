@@ -7,12 +7,10 @@ p{
 ## Item 13 以对象管理资源
 ----
 ### 快速看点
-----
 + 以对象管理资源常被称为资源取得时机就是初始化时机。
 + 不要总是觉得new出来的对象一定会有delete，特别是在别人接手以后。
 + auto_ptr和shared_ptr可以自动删除，其中auto_ptr指向的对象最多只被一个指针拥有，而shared_ptr可以计数。而且shared_ptr可以自定义deleter，但是auto_ptr不行
 ### 为什么需要使用RAII对象
-----
 假设有这样一段代码：
 ```C++
 Investment *createInvestment(); //工厂模式
@@ -41,7 +39,6 @@ void f()
 
 但是问题解决了吗？其实没有。详情见Item 18。
 ### auto_ptr和shared_ptr
----
 如果一个普通指针和shared_ptr同时指向一个对象，shared_ptr不会把这个普通指针计入引用，在shared_ptr都不指向这个对象时，这个普通指针指向的对象也不存在。举例见下。
 ```C++
 #include <bits/stdc++.h>
