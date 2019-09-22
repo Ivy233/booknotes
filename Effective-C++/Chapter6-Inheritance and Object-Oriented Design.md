@@ -246,9 +246,87 @@ public:
 ## Item 36 绝不重新定义继承而来的non-virtual函数
 ---
 ### 快速看点
++ 如题
+### 一个例子
+我们考虑有两个类，其中Derived <b>public</b>继承了Base，而且Base定义了一个func函数。那么这段代码应当两个func的调用用的是同一个func。
+```C++
+Derived d;
+Base* pb = &d;
+Derived* pd = &d;
+pb->func();
+pd->func();
+```
+但是如果Derived继承的func被重新定义了呢？
+```C++
+class Base{
+public:
+    void func(){}
+};
+class Derived: public Base{
+public:
+    void func(){}   // 隐藏了父类的名称func，见Item 33
+};
+```
+这个时候两者就不一样了。
+
+不一样就不一样了，有什么问题呢？
+### 和设计模式相关的
++ 如果一个类public继承了另外一个，那么就认为Derived类也是一种Base类。如果这个时候要求两者的同一个函数进行的是不同的操作，那么这个时候就会是很难受的事情了：到底两个是否是is-a关系呢？
++ 除此以外，如果你用名称遮盖了base类的func，那也应该用virtual函数来指定，否则一旦派生类变成了子类，他就再也没有机会访问到自己的函数了。
 ## Item 37 绝不重新定义继承而来的缺省参数值
 ---
 ### 快速看点
++ 如题
++ 函数缺省参数值是静态绑定，但是virtual是动态绑定。
+### 为什么会有这种问题？
+假如我们按照颜色来画图画：
+```C++
+class Shape {
+public:
+    enum ShapeColor { Red, Green, Blue };
+    virtual void draw(ShapeColor color = Red) const = 0;
+};
+class Rectangle: public Shape {
+public:
+    virtual void draw(ShapeColor color = Green) const;
+};
+class Circle: public Shape {
+public:
+    virtual void draw(ShapeColor color) const;
+};
+```
+如果我们进行了如下的调用：
+```C++
+Shape *pc = new Circle;
+Shape *pr = new Rectangle;
+pc->draw();
+pr->draw();
+```
+应该能很明显的发现调用的draw是什么东西——如果你不知道的话请回头看一下virtual的用法。但是今天讨论的问题是：那个参数color到底是什么。
+### 问题
+如果你把代码丢进去编译的话，发现代码是能编译的通过的。通过这句话你就应该察觉到不对：Circle的应该是要求输入参数的，为什么能通过编译呢？然后你在里面加入了输出color和类的特征字符串。结果得到了两个0。
+
+多么神奇的结果！Base的指针获得了Derived的对象之后可以调用Derived的函数，但是传入的参数却是Base的。
+
+这个不正常的问题就显而易见了：为什么采取了静态缺省参数和动态绑定函数名？这本书给出了这样的解释：
+>为什么 C++ 要坚持按照这种不正常的方式动作？答案是为了运行时效率。如果 default parameter values（缺省参数值）是 dynamically bound（动态绑定），compilers（编译器）就必须提供一种方法在运行时确定 virtual functions（虚拟函数）的 parameters（参数）的 default value(s)（缺省值），这比目前在编译期确定它们的机制更慢而且更复杂。最终的决定偏向了速度和实现的简单这一边，而造成的结果就是你现在可以享受高效运行的乐趣，但是，如果你忘记留心本 Item 的建议，就会陷入困惑。
+### 解决
+这个和Item 35一样的，可以考虑使用NVI的实现方式，当然，其他的方法也有很多，比如不再重定义默认参数。
+```C++
+class Shape{
+public:
+    void draw(Color c = Red) const{
+        doDraw(color);
+    }
+private:
+    virtual void doDraw(Color c) const = 0;
+};
+class Rect: public Shape{
+    ...
+private:
+    virtual void doDraw(Color c) const;
+};
+```
 ## Item 38 通过复合塑模出has-a或者“根据某物实现出”
 ---
 ### 快速看点
