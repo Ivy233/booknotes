@@ -243,6 +243,122 @@ public:
 ## Item 35 考虑virtual函数以外的其他选择
 ---
 ### 快速看点
+假设你在开发一个游戏，然后需要计算一个人物的健康值，那么你可以这么写。
+```C++
+class GameCharacter {
+public:
+    virtual int healthValue() const;
+};
+```
+实现成virtual代表了这玩意仅仅是给出了默认实现，可以替换。但是有没有其他方法呢？
+### NVI模式
+把所有的东西交给一个函数有些时候过于让人不去关注，从而破坏了异常安全的部分。那么这个时候就可以考虑public函数提供一个强制实现，而private里面提供一个virtual，这样你希望不被修改的东西丢在public里面，private里面丢可调整的部分。
+```C++
+class GameCharacter{
+public:
+    int healthValue() const{
+        // 你可以做些事情，比如异常安全
+        int ret = doHealthValue();
+        // 这里也可以做
+        return ret;
+    }
+private:
+    virtual int doHealthValue() const{
+        // 默认实现
+    }
+}
+```
+NVI的好处已经在之前和代码里提到了。
+
+但是C++有个奇怪的地方，doHealthValue是不可调用的，但是子类却可以重写。但是实际上仔细想想没啥大的问题：我定义我的，你调用你自己的，我又不调用你的private，在外面调用也可以调用private函数。
+
+但是如果要求调用Base class的东西的时候，就需要把这玩意声明为protected了。
+### 函数指针实现策略模式
+NVI确实是不错的东西，但是还是在虚函数中做文章。有些更加夸张的主张：直接把函数替换掉，这样就不会卡在一个函数里面了。
+```C++
+class GameCharacter;
+int defaultHealthCalc(const GameCharacter& gc);
+class GameCharacter{
+public:
+    typedef int (*HealthCalcFunc)(const GameCharacter&);//函数指针
+    //初始化
+    explicit GameCharacter(HealthCalcFunc hcf = defaultHealthCalc)
+        : healthFunc(hcf){}
+    //调用
+    int healthValue() const{
+        return healthFunc(*this);
+    }
+private:
+    HealthCalcFunc healthFunc;
+}
+```
+这就是被称为策略模式（Strategy），可以在运行时指定每个对象的生命值计算策略，比虚函数有更大的灵活性。
++ 同一角色类的不同对象可以有不同的healthCalcFunc，只需要在构造的时候传入即可。
++ 对于一个指定的角色健康值的计算函数可以在运行时改变。
+
+但是实际上有一个巨大的问题：我们在外部定义了这个函数，于是无法访问private和protected，这很有可能会弱化封装。在弱化封装和便捷性之间做出一个平衡需要考虑的。
+### function模板实现策略模式
+如果我们加入模板的话
+```C++
+class GameCharacter;
+int defaultHealthCalc(const GameCharacter& gc);
+class GameCharacter{
+public:
+    //声明
+    typedef std::function<int (const GameCharacter&)> HealthCalcFunc;
+    //初始化
+    explicit GameCaracter(HealthCalcFunc hcf = defaultHealthCalc)
+        : healthCalcFunc(hcf){}
+    //调用
+    int healthValue() const{
+        return healthFunc(*this);
+    }
+private:
+    HealthCalcFunc healthFunc;
+};
+```
+这样实现相对于纯指针而言有一些好处
++ 返回值只需要兼容int即可，比如short。
++ 输入函数可以为任意函数，仿函数与成员函数，只不过是有多复杂的问题。
+```C++
+//function
+short calcHealth(const GameCharacter&);
+xxx(calcHealth);
+//functor
+struct HealthCalculator{
+    int operator()(const GameCharacter&) const{...}
+};
+xxx(HealthCalculator());
+//member-function
+class GameLevel{
+public:
+    float health(const GameCharacter&) const;
+};
+GameLevel pqr;
+xxx(std::bind(&GameLevel::health, pqr, _1));
+```
+（说句实话第三个我时第一次见，C++11果然和C++是两门语言。）
+（建议实现一下STL，就不会看不懂模板了）
+
+这里有必要解释一下bind是怎么用的。对于这样的函数而言，*this是第一个参数，而众所周知_1是待填充的一个东西，这个bind的第二个参数才GameLevel::health()参数表的第一个参数。
+### 经典的策略模式
+看完了这么多可能看不懂的代码之后，我们来看一点简单的，不秀这么多神奇的语法，仅仅在继承上面做文章。
+
+我们尝试把计算函数做成一个类，然后由角色进行has-a的引入。之后
+```C++
+class GameCharacter {
+public:
+    explicit GameCharacter(HealthCalcFunc *phcf = &defaultHealthCalc)
+        : pHealthCalc(phcf) {}
+    int healthValue() const { return pHealthCalc->calc(*this);}
+
+private:
+    HealthCalcFunc *pHealthCalc;
+};
+```
+这样是不是结构要比之前明晰多了？虽然我没给出HealthCalcFunc的实现，但是也可以猜出一个大概。
+
+这就是标准的策略模式。
 ## Item 36 绝不重新定义继承而来的non-virtual函数
 ---
 ### 快速看点
