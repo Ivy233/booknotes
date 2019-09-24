@@ -446,9 +446,127 @@ private:
 ## Item 38 通过复合塑模出has-a或者“根据某物实现出”
 ---
 ### 快速看点
++ is-a，has-a这三个分别对应public继承，在内部引入。（如果你想简单一点理解的话。
++ STL对象不建议public继承。这里是重提一遍。
++ 如果更具体一点说明的话，has-a指对象，而将方法转发出来的行为意味着根据某物实现出。
+### 还需要讲什么吗
 ## Item 39 明智而审慎地使用private继承
 ---
 ### 快速看点
++ private继承意味着根据某物实现出，能掩盖掉从基类继承来的成员。
++ 除非绝对必要，否则不要用private继承。
++ 与复合不同，私有继承能使空基类优化有效，这对于致力于最小化对象大小的开发者来说极其重要。
+### 一个奇怪的例子
+我们实现了一个Person类，一个Student类，并且产生如下的调用：
+```C++
+class Person { ... };
+class Student: private Person { ... };
+void eat(const Person& p);
+
+Person p;
+Student s;
+eat(p);
+eat(s); //???
+```
+理论上学生能吃啊，结果你会在这里收到一条编译错误：cannot cast 'const Student' to its private base class 'const Person'。
+### 复合与private继承的区别
+加入我们写了一个Widget表示一个窗口，我们想实现一个Timer类记录时间，从而进一步体现出随着时间的调用次数变化。
+
+这里很显然不是public继承，因为这两者不构成is-a关系，并且很容易被其他类调用。除此以外我们不希望被derived类调用，因此考虑只有两种选择：private继承和复合。
+
+然后我们先写一个Timer的实现：
+```C++
+class Timer {
+public:
+   explicit Timer(int tickFrequency);
+   // automatically called for each tick
+   virtual void onTick() const;
+};
+```
++ private继承下，我们可以给出这样的实现：
+```C++
+class Widget: private Timer {
+private:
+    // look at Widget usage data, etc.
+    virtual void onTick() const;
+};
+```
+不过这一种有点问题：friend类可以访问，而且继承都可以重定义这玩意。
++ 在复合中可以给出一个这样的实现。
+```C++
+class Widget {
+private:
+    class WidgetTimer: public Timer {
+    public:
+        virtual void onTick() const;
+    };
+    WidgetTimer timer;
+};
+```
+在很多情况下，大多数人都会选择第二种方式，具体原因可以仔细比较（提示：从继承和编译依赖考虑）。
+### 什么时候可以使用private继承
++ 当一个将要成为derived class的类访问其base class的protected构建，但是class的关系却不是is-a，而是根据某物实现出。
++ 另一种情况就是空间最优化，这是一种极端情况。对于一个什么占用空间的成员都没有的类而言，其sizeof大多数为1，因为C++会给这玩意插入一个char。如果将其进行复合处理，会进行空间占用，进而出现空间膨胀；这种情况下进行private继承会好很多，因为可以合并空间，减小其sizeof。虽然这种情况在日常编程中很少发生，但是不要忽略掉嵌入式。
 ## Item 40 明智而审慎地使用多重继承
 ---
 ### 快速看点
+对于多继承，C++社区会有两个基本阵营。
++ 单继承有好处，多继承更有好处。
++ 单继承有好处，但是多继承的麻烦会导致得不偿失。
+
+说句实话，我更支持第二种，因为多重继承会过多引入成员，更复杂的是对于一样的函数（比如ftream继承于iftream和oftream），应该继承谁的？相比之下，Java的单继承+多接口更加舒服，但是如果可以给默认实现就更能体现灵活性。
+### 歧义问题
+```C++
+class A{
+public:
+    void func();
+};
+class B{
+private:
+    bool func() const;
+};
+class C: public A, public B{ ... };
+C c;
+c.func(); //???
+```
+请问最后一行的func调用的是谁的呢？对应错误内容为：member 'func' found in multiple base classes of different types。
+
+在编译器中，两个func其实都得到了继承，所以public A和B这里没有报错。也就是说，既然两者都在C中，那么我们只需要指定是谁的就可以解决问题。
+```C++
+c.A::func();
+c.B::func(); // 'func' is a private member of 'B'
+```
+### 多继承菱形
+我们来看一个经典例子：
+```C++
+class File { ... };
+class InputFile: public File { ... };
+class OutputFile: public File { ... };
+class IOFile: public InputFile, public OutputFile
+{ ... };
+```
+除了函数调用的歧义以外，还有一个明显的问题：你打开文件的时候总归需要一个文件名，那么这个时侯打开的文件名重复了就很尴尬。
+
+对于这个问题，C++选择了普渡众生，虽然默认选择了复制，但是给出了另一个选择，就是在不需要的时候进行虚拟继承(virtual inheritance)。
+
+可能有很多时候需要virtual继承，但总是会有代价的。
++ 虚继承类的对象会更大一些。
++ 虚继承类的成员访问会慢一些。
++ 虚继承类的初始化反直觉。继承层级的最底层负责虚基类的初始化，而且负责整个继承链上所有虚基类的初始化。
+
+所以能不用就不用，能不丢数据就不要丢数据。
+### 接口类
+类似于Java的接口，没有实现的类交作接口类：
+```C++
+class IPerson {
+public:
+    virtual ~IPerson();
+    virtual std::string name() const = 0;
+    virtual std::string birthDate() const = 0;
+};
+```
+同样的，类似于Java，可以同时实现接口类与实现类
+```C++
+class CPerson: public IPerson, private PersonInfo{}
+```
+由于由virtual继承，虚函数可以在里面重写并且继承。如果想要重写的话，还得是要private继承。
