@@ -288,12 +288,289 @@ boost::scoped_array<T> pData;
 ## Item 45 运用成员函数模板接受所有兼容类型
 ----
 ### 快速看点
++ 成员函数模板可以帮助你兼容所有的类型的运算，但是请把控好尺度，否则回礼也很丰厚的。
++ 泛型赋值和初始化不能代替编译器自己生成的常规拷贝构造和拷贝赋值。
+### 自己实现一个
+shared_ptr这么智能，能不能自己实现一个，同时能得到裸指针的大部分特性？比如让这一段代码通过编译？
+```C++
+class Top { ... };
+class Middle: public Top { ... };
+class Bottom: public Middle { ... };
+Top *pt1 = new Middle;                   // convert Middle* => Top*
+Top *pt2 = new Bottom;                   // convert Bottom* => Top*
+const Top *pct2 = pt1;                   // convert Top* => const Top*
+```
+这可能不是一个小问题，因为这涉及到不止一个类型的指针转化，而且要考虑到兼容和可扩展的问题，所以最好的选择还是模板。
+
+首先我们完成从外界获取指针进行初始化的工作。
+```C++
+template<typename T>
+class SmartPtr {
+public:
+    explicit SmartPtr(T *realPtr);
+};
+```
+这样就能完成一些调用了。
+
+然后加入初始化同类型指针的事情
+```C++
+    template<typename U>
+    SmartPtr(const SmartPtr<U>& other);
+```
+这样就能完成大部分的初始化内容了（你也可以简单的理解为全部）。
+
+然后我们从设计上考虑一些问题：我们设计这些指针最重要的目的有两个：
++ 模拟裸指针。
++ 在裸指针上面完成自己需要完成的安全性考虑。
+
+从编译的角度考虑，我们只需要考虑第一点：裸指针。第二点考虑起来就不是一句两句话说的清楚的事情了。
++ 第一个声明为explicit，是因为我们希望使用者能知道这样的转化，至少是一个提醒。
++ 第二个不声明为explicit，与第一点正好相反。
++ 将初始化的方式从类的内部转换到类中裸指针的初始化，这样可以减少一些麻烦。
+
+到这里就结束了吗？看上去是的，其实不是。
+### 学习smart_ptr
+这里东西就和原来的不一样了，我们先来看一下部分源码：
+```C++
+template<class T> class shared_ptr {
+public:
+    template<class Y>
+        explicit shared_ptr(Y * p);
+    template<class Y>
+        shared_ptr(shared_ptr<Y> const& r);
+    template<class Y>
+        explicit shared_ptr(weak_ptr<Y> const& r);
+    template<class Y>
+        explicit shared_ptr(auto_ptr<Y>& r);
+    template<class Y>
+        shared_ptr& operator=(shared_ptr<Y> const& r);
+    template<class Y>
+        shared_ptr& operator=(auto_ptr<Y>& r);
+};
+```
+看完源码你可能会询问一个问题：这里存在大量的模板，如果T=Y又会发生什么？
+
+注意这里只出选了部分的源码，接着往下看另外一个角度看的一部分：
+```C++
+template<class T> class shared_ptr {
+public:
+    shared_ptr(shared_ptr const& r);
+
+    template<class Y>
+        shared_ptr(shared_ptr<Y> const& r);
+
+    shared_ptr& operator=(shared_ptr const& r);
+
+    template<class Y>
+        shared_ptr& operator=(shared_ptr<Y> const& r);
+};
+```
+于是真相大白了：
++ 根据template特化的规则，优先采用没有template的，之后采用全特化的，接着采用偏特化的，最后采用全部都是template的。这意味着如果两个sahred_ptr进行互相转化，会优先调用自己。
++ 除此以外，还有一点：就算有了template的初始化函数，编译器也会给一个自己互相转化的初始化函数，为什么？看之前的重要规则：编译器不会把不能确定的东西当作类型的判据，也就是说，这些函数会被忽略掉，而在编译完成之后会有自己的类型。
 ## Item 46 需要类型转换时请为模板提供非成员函数
 ----
 ### 快速看点
++ template中的隐式转换和纯OO的转换不太一样，还是那句话，涉及到编译期不会把不能确定的东西当成一个可以用的东西。
++
+### 之前的Rational
+我们把之前的Rational给翻出来看看
+```C++
+class Rational{
+public:
+    Rational(int n = 0, int d = 1);
+    int numerator() const;
+    int denominator() const;
+}
+const Rational operator*(const Rational& lhs, const Rational& rhs)
+{
+    return Rational(lhs.numerator() * rhs.numerator(), lhs.denominator() * rhs.denominator());
+}
+```
+于是乎你突发奇想，想改成模板：
+```C++
+template<typename T>
+class Rational {
+public:
+    Rational(const T& numerator = 0, const T& denominator = 1);
+    const T numerator() const;
+    const T denominator() const;
+};
+
+template<typename T>
+const Rational<T> operator*(const Rational<T>& lhs, const Rational<T>& rhs); //省略掉，不写了。
+```
+然后你打算调用一下：
+```C++
+Rational<int> oneHalf(1, 2);
+Rational<int> result = oneHalf * 2;
+```
+然后你的到了一个编译错误：invalid operands to binary expression ('Rational<int>' and 'int')。
+
+没找到那个函数？黑人问号.jpg。
+```C++
+    Rational<int> oneHalf(1, 2), Two(2);
+    Rational<int> result = oneHalf * Two;
+```
+咋这能过编译呢？是不是编译器脑子有包？
+### 参数推导？
+我们来看一下我们希望编译器到底在干什么。
++ 对于oneHalf进行参数推导，发现T=int。
++ 希望第二个参数2也是Rational<int>。
++ 尝试把2转换成Rational<int>。
++ 转化成功，开始计算。
+
+这是我们希望的编译过程，但是事与愿违，从前面两个程序的对比中你可以看出什么吗？
+
+对！就是第三步2无法转化成Rational才导致的这一点。但是明明定义了转换函数，为什么没有转换呢？
+
+因为编译器不会考虑这个。就这么简单。
+>它们不这样做是因为在 template argument deduction（模板实参推演）过程中从不考虑 implicit type conversion functions（隐式类型转换函数）。从不。这样的转换可用于函数调用过程，这没错，但是在你可以调用一个函数之前，你必须知道哪个函数存在。为了知道这些，你必须为相关的 function templates（函数模板）推演出 parameter types（参数类型）（以便你可以实例化出合适的函数）。但是在 template argument deduction（模板实参推演）过程中不考虑经由 constructor（构造函数）调用的 implicit type conversion（隐式类型转换）。
+### 类中定义
+既然找不到我们就把这玩意丢进去喽。
+```C++
+template<typename T>
+class Rational {
+public:
+    friend const Rational operator*(const Rational& lhs, const Rational& rhs);
+};
+
+template<typename T>
+const Rational<T> operator*(const Rational<T>& lhs, const Rational<T>& rhs){}
+```
+继续尝试调用，发现能过编译了，但是不能过链接？难道非要把实现也丢在里面吗？
+
+对！就要这样做。
++ 在oneHalf出现的时候，编译器能进行参数推导，并生成Rational<int>，然后初始化参数2，实验证明交换位置也可以完成同样的事情。
++ 在尝试链接的时候，发现operator*没有定义。这是因为其定义依旧不能推断出T是个什么东西。
+
+那就没办法了，只能把定义也丢进去。
+### 其他的手段
+你可能觉得定义也丢进去实在太丑了，有没有比较好的手段呢？外面搞一个辅助函数就行了。
 ## Item 47 请使用traits classes表现类型信息
 ----
 ### 快速看点
++ STL提供了很多traits和iterators，以及很多tags，通过templates在编译期完成函数的确定和分类，最大化提升效率。
++ 关于这方面，译者自编了一本书，建议大家去看看，最少去看看网课，讲的真的不错。
+### STL迭代器tag
+```C++
+struct input_iterator_tag {};
+struct output_iterator_tag {};
+struct forward_iterator_tag: public input_iterator_tag {};
+struct bidirectional_iterator_tag: public forward_iterator_tag {};
+struct random_access_iterator_tag: public bidirectional_iterator_tag {};
+```
+其中有这些区别：输入迭代器只能读取，并且只能读取一次，输出迭代器只能写入，并且只能写入一次，后面的基本就是字面意思。
+
+这是最基本，最常用的区别，更多区别请看C++官网。
+### traits和tag的联合使用
+由于traits的实现实在太长了，这一块的具体实现还是自行查阅比较好。
+
+通过traits（萃取机）和tag，重载的联合使用，可以完成对于一些函数的分类，达到性能的最优化。这里给出一套比较经典的实现，不给注释，看看能否理解。
+```C++
+template <class _InputIter, class _Tp>
+inline _InputIter find(_InputIter __first, _InputIter __last,
+                       const _Tp& __val)
+{
+  __STL_REQUIRES(_InputIter, _InputIterator);
+  __STL_REQUIRES_BINARY_OP(_OP_EQUAL, bool,
+            typename iterator_traits<_InputIter>::value_type, _Tp);
+  return find(__first, __last, __val, __ITERATOR_CATEGORY(__first));
+}
+template <class _InputIter, class _Tp>
+inline _InputIter find(_InputIter __first, _InputIter __last,
+                       const _Tp& __val,
+                       input_iterator_tag)
+{
+  while (__first != __last && !(*__first == __val))
+    ++__first;
+  return __first;
+}
+template <class _RandomAccessIter, class _Tp>
+_RandomAccessIter find(_RandomAccessIter __first, _RandomAccessIter __last,
+                       const _Tp& __val,
+                       random_access_iterator_tag)
+{
+  typename iterator_traits<_RandomAccessIter>::difference_type __trip_count
+    = (__last - __first) >> 2;
+
+  for ( ; __trip_count > 0 ; --__trip_count) {
+    if (*__first == __val) return __first;
+    ++__first;
+
+    if (*__first == __val) return __first;
+    ++__first;
+
+    if (*__first == __val) return __first;
+    ++__first;
+
+    if (*__first == __val) return __first;
+    ++__first;
+  }
+
+  switch(__last - __first) {
+  case 3:
+    if (*__first == __val) return __first;
+    ++__first;
+  case 2:
+    if (*__first == __val) return __first;
+    ++__first;
+  case 1:
+    if (*__first == __val) return __first;
+    ++__first;
+  case 0:
+  default:
+    return __last;
+  }
+}
+```
+看到这些奇怪的名字不要害怕，这些只是一系列变量而已。
+### 如何定义traits
+```C++
+template < ... >
+class deque {
+public:
+    class iterator {
+    public:
+        typedef random_access_iterator_tag iterator_category;
+    }:
+};
+```
+使用的时候就是
+```C++
+deque::iterator
+```
 ## Item 48 认识templates元编程
 ----
 ### 快速看点
++ 模板大法好
+### 一个简单的小例子
+假如你要写阶乘，你可能是这样写的
+```C++
+fac[0] = 1;
+for(int i = 1; i < 20; i++)
+    fac[i] = fac[i - 1] * i;
+```
+但是用了模板之后，可以这么写：
+```C++
+template<unsigned n>
+struct Factorial{
+    enum{ value = n * Factorial<n-1>::value };
+};
+template<>
+struct Factorial<0>{
+    enum{ value = 1 };
+};
+
+int main(){
+    cout<<Factorial<5>::value;
+}
+```
+黑人问号.jpg。利用偏特化理解递归终点，然后利用递归来得到结果，并且如果输入不合法立刻报错，编译都过不去。模板这么BT。
+### 模板的真实水准
+实际上，TMP(Template Metaprogramming)是被证明图灵完全的，也就是说只要能算的问题TMP都可以做，只不过可能样子你不认得而已。
+
+再来看几个比较简单的例子吧，这些都是一旦错了连编译都过不去的#滑稽，异常都省下来了。
++ 量纲正确，通过template限制类型。
++ 表达式模板，消除运算过程中的临时对象，具体看[这个链接](https://blog.csdn.net/dbzhang800/article/details/6693454)
++ 策略模式，这个自己回去翻。
