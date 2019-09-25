@@ -4,7 +4,11 @@
 基本保证每天更新，更新内容不定，但是保证只要没看完一本书就不会看下一本。
 Base的CSAPP是之前的东西，可以暂时不管。
 
-2019-09-25 Effective-C++ Item41-Item43(not finished)
+2019-09-27 Effective-C++ Item45-Item48(not finished)
+
+2019-09-26 不更新，时间被MIX Alpha占用掉了（我排队三小时也要去摸这个机子#滑稽）
+
+2019-09-25 Effective-C++ Item41-Item44(finished)
 
 2019-09-24 Effective-C++ Item38-Item40(finished)
 
