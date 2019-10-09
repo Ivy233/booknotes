@@ -1,8 +1,3 @@
-<style>
-p{
-    text-indent:2em;
-}
-</style>
 # 让自己习惯C++
 ## Item 1 视C++为一个语言联邦
 -----
@@ -112,6 +107,8 @@ class vector
 完全一样的返回类型，完全一样的形参表，为什么会有两个这样的函数？实际上在`const`变量上面调用`[]`，会调用前者，反之会调用后者。这样就区分开两个函数了。
 
 我们给一个函数附上`const`，是希望这个函数不允许修改任何成员变量，比如说：
+<span id='Point'></span>
+
 ```C++
 class Point
 {
@@ -140,7 +137,6 @@ rec.getLeftUpside().setPoint(x, y);
 这个时候又有另外一个问题出现了，如果`const`带和不带的实现是一样的，而且代码比较长，如何提升代码的重用率，降低出错的可能？
 
 可以考虑这样：
-{#index}
 ```C++
 class TextBlock
 {
@@ -164,43 +160,24 @@ public:
 
 编译器甚至采用了第一种方法，因为实现起来简单。甚至你无法想象什么叫做客户端侦测不出（至少我想不出来）。但是如果你希望实现`logic`呢？在涉及到的变量上面加入`mutable`，这样所有`const`函数都可以修改这玩意了（好危险啊）。
 
-这个时候回头来看[这一段代码](#index)
-```C++
-class Point
-{
-    double x, y;
-    void setPoint(const double &_x, const double &_y)
-    {
-        x = _x;
-        y = _y;
-    }
-};
-class Rectangle
-{
-    Point LeftUpside, RightDownside;
-    Point& getLeftUpside() const
-    {
-        return LeftUpside;
-    }
-} rec;
-```
-那这是不是意味着用的是logic？其实不是，因为修改getLeftUpside的返回值根本不是它自己的的事情，已经结束这个函数了才修改。
+这个时候回头来看[这一段代码](#Point)
+那这是不是意味着用的是logic？其实不是，因为修改`getLeftUpside`的返回值根本不是它自己的的事情，已经结束这个函数了才修改。
 
 ## Item 4 确定对象被使用前已先被初始化
 ----
 ### 别忘记初始化对象了
-在任何一个class中，如果不提供初始化函数，那么对象有可能会不初始化。众所周知，不进行初始化是非常危险的，因为它很有可能引发不可预料的错误。在class中有两类初始化方式：
+在任何一个`class`中，如果不提供初始化函数，那么对象有可能会不初始化。众所周知，不进行初始化是非常危险的，因为它很有可能引发不可预料的错误。在`class`中有两类初始化方式：
 ```C++
 class Student
 {
     std::string name;
     std::string stuid;
-    int abc; //一时想不起来啥属性比较好
-    Student(const std::string& _name, const std::string& _stuid, const int& _abc)
+    int age;
+    Student(const std::string& _name, const std::string& _stuid, const int& _age_)
     {
         name = _name;
         stuid = _stuid;
-        abc = _abc;
+        age = _age;
     }
 }
 ```
@@ -209,9 +186,9 @@ class Student
 {
     std::string name;
     std::string stuid;
-    int abc; //一时想不起来啥属性比较好
+    int age;
     Student(const std::string& _name, const std::string& _stuid, const int& _abc)
-      : name(_name), sutid(_stuid), abc(_abc) {}
+      : name(_name), sutid(_stuid), age(_age) {}
 }
 ```
 两者在这里的结果是一样的，但是过程似乎不太一样，因为前者等价于
@@ -220,26 +197,26 @@ class Student
 {
     std::string name;
     std::string stuid;
-    int abc; //一时想不起来啥属性比较好
-    Student(const std::string& _name, const std::string& _stuid, const int& _abc)
-      : name(), sutid(), abc()//默认的初始化
+    int age;
+    Student(const std::string& _name, const std::string& _stuid, const int& _age)
+      : name(), sutid(), age()//默认的初始化
     {
         name = _name;
         stuid = _stuid;
-        abc = _abc;
+        age = _age;
     }
 }
 ```
 默认初始化函数干了啥由编译器(built-in类型)和类的实现决定。显然后者比前者（忽略那个等价例子）少了一系列赋值操作。
 
-除此以外，在STL中可见很多类采用了类似于这样的初始化方式：把所有初始化函数进行封装，形成一个成员函数，以private的形式体现，由各种初始化函数进行调用。这是因为有太多的初始化函数很类似，在不影响效率的情况下进行这样的操作是可以理解的，同时还能减少调试的复杂度。
+除此以外，在`STL`中可见很多类采用了类似于这样的初始化方式：把所有初始化函数进行封装，形成一个成员函数，以`private`的形式体现，由各种初始化函数进行调用。这是因为有太多的初始化函数很类似，在不影响效率的情况下进行这样的操作是可以理解的，同时还能减少调试的复杂度。
 ### 跨编译单元的初始化顺序，用local static替换掉non-local static对象
 ----
-假设有一个FileSystem的类，它让互联网上的文件看上去像是一个本机。由于这个class形成了一个单一文件系统，那么会产生一个对象在global作用域内
+假设有一个`FileSystem`的类，它让互联网上的文件看上去像是一个本机。由于这个`class`形成了一个单一文件系统，那么会产生一个对象在`global`作用域内
 ```C++
 extern FileSystem tfs; // 多文件使用
 ```
-如果在tfs构造完成之前调用它的成员函数那么会产生很严重的后果。比如在另外一个文件中，需要定义一个class交作Directory，用作目录
+如果在`tfs`构造完成之前调用它的成员函数那么会产生很严重的后果。比如在另外一个文件中，需要定义一个`class`交作`Directory`，用作目录
 ```C++
 class Directory // 注意，这在另外一个文件中
 {
@@ -252,7 +229,7 @@ public:
     }
 }
 ```
-如果tfs在Directory初始化的时候没有定义过，不就滑稽了吗#滑稽。
+如果`tfs`在`Directory`初始化的时候没有定义过，不就滑稽了吗#滑稽。
 因为这两个东西可能是不同的人在不同的时间于不同的源码文件建立起来的，所以根本无法保证初始化顺序。这样的解决办法可以是
 ```C++
 class FileSystem
@@ -284,6 +261,6 @@ Directory& tempDir()
     return td;
 }
 ```
-这样只需要用tempDir()和tfs()指定这个FileSystem和临时Directory即可。
+这样只需要用`tempDir()`和`tfs()`指定这个`FileSystem`和临时`Directory`即可。
 
-看过设计模式的一眼都能看出来：这是Singleton设计模式的常见实现手法。
+看过设计模式的一眼都能看出来：这是`Singleton设计模式`的常见实现手法。

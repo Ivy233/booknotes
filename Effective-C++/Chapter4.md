@@ -1,9 +1,6 @@
-<style>
-p{
-    text-indent:2em;
-}
-</style>
 # 设计与声明
+<span id='Item_18'></span>
+
 ## Item 18 让接口容易被正确使用，不易被误用
 ----
 ### 快速看点
