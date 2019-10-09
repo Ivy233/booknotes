@@ -2,10 +2,8 @@
 <span id='Item_49'></span>
 
 ## Item 49 了解 `new_handler` 的行为
------
 ### 快速看点
 + `set_new_handler`允许用户替换掉这个类的构造出现问题的时候的应对方式，当然给了这么大的权力也应当学会使用。
-+
 ### `set_new_handler`
 在`operator new`出现问题的时候，它会抛出异常，也有可能返回一个`null`指针。在抛出异常之前，它会先调用一个用户指定的错误处理函数，这被称之为`set_new_handler`操作。在`std`中存在这样的声明：
 ```C++
@@ -108,7 +106,6 @@ if(p2 == 0) // 失败的时候进入if
 }
 ```
 ## Item 50 领会何时替换 `new` 和 `delete` 才有意义
------
 ### 快速看点
 + 有很多定制`new`和`delete`的理由，包括改进性能，调试错误，收集堆用法的信息。
 + 定制一个`new`很容易，但是定制一个好的`new`非常困难。在你有足够的理论和demo之前，最好不要随意触摸这个直接接触机器的领域，除非你想蓝屏。
@@ -152,7 +149,6 @@ void* operator new(std::size_t size) throw(std::bad_alloc) {
 + 聚集类的对象。这是不太容易想到的一点，减小跳页的开销也可以提升速度。
 + 你知道你要干啥，那就去做，相信你有驾驭的能力。
 ## Item 51 编写 `new` 和 `delete` 时要遵守惯例
-----
 ### 快速看点
 + `new`需要注意的细节很多，但是`delete`需要注意的细节比较少。
 + `new`的方式和`delete`的方式建议配套，除非你知道自带的干了些什么。
@@ -240,7 +236,6 @@ void Base::operator delete(void *rawMem, std::size_t size) throw(){
 }
 ```
 ## Item 52 如果编写了placement new，就要编写placement delete
-----
 ### 快速看点
 + 在分配内存的时候，应当对于类对象附上初值，在C++中，这由两个函数完成，第一个为`new`，第二个placement new。
 + `new`和`delete`应当成对出现，并且
