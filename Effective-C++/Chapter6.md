@@ -80,6 +80,9 @@ assert(s.width() == s.height());//正方形应该长宽相等
 ### 其他关系
 + `has-a`：再类中带入一个其他类的成员。
 + `is-implemented-in-terms-of`：用这个东西实现出来。
+
+<span id='Item_33'></span>
+
 ## Item 33 避免遮掩继承而来的名称
 ---
 ### 快速看点

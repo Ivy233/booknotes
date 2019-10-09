@@ -176,6 +176,8 @@ void printNameAndDisplay(const Window &w)
 + 绝不要返回一个局部栈对象的指针或引用。
 + 绝不要返回一个被分配的堆对象的引用。
 + 如果存在需要一个以上这样的对象的可能性时，绝不要返回一个局部static对象的指针或引用。
+<span id='Rational'></span>
+
 ### 一个例子
 ```C++
 class Rational {
