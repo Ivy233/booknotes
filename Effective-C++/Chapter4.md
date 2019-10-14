@@ -164,6 +164,7 @@ void printNameAndDisplay(Window w)
 ```C++
 void printNameAndDisplay(const Window &w)
 ```
+<span id='reference_pointer'></span>
 以后，问题就很神奇的解决掉了。其具体原因在编译器里：引用大多数采用指针实现，换句话说，传一个引用意味着传递一个指针。仔细想想这两个似乎本质上一样。
 
 再仔细想想有没有pass-by-value比较适合的情况？内建类型(int, double之类)，STL类型都是值得pass-by-value的。但是一定要注意不是所有<I>小对象</I>都值得pass-by-value，一个double和一个只有一个double构成的对象就有可能采取不一样的措施，这会涉及到寄存器和内存的访问差异。

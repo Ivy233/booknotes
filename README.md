@@ -9,6 +9,7 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
+2019-10-14 | wsl-config | 第一版 | finished
 2019-10-09 | all | 修改格式，全方位 | finished
 2019-09-29 | More-Effective-C++ | Item1-Item4 | finished
 2019-09-28 | Effective-C++ | Item49-Item52 | finished
