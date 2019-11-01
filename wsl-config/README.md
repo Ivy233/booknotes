@@ -1,9 +1,8 @@
 # wsl的LAMP苦逼调试过程，在此记录一下
 ## wsl是什么东西
 [某一天巨硬CEO说了一句话：](https://cloudblogs.microsoft.com/windowsserver/2015/05/06/microsoft-loves-linux/)
-```
-Microsoft Loves Linux
-```
+> Microsoft Loves Linux
+
 于是乎就有了一个东西叫做，全称[Windows Subsystem for Linux](https://zh.wikipedia.org/wiki/%E9%80%82%E7%94%A8%E4%BA%8E_Linux_%E7%9A%84_Windows_%E5%AD%90%E7%B3%BB%E7%BB%9F)
 
 对于wsl的配置，由于已经配好，所以出错过程只能做到尽可能回忆起来，但不保证全面，也有可能你没遇到我这个bug，也有可能遇到了我没遇到过的bug。
@@ -16,12 +15,12 @@ Microsoft Loves Linux
 但是在重装系统之后不可复现。windows本身就是一个很复杂的系统，平行弄一套wsl的复杂度不会低于windows。
 ## wsl的安装
 ### wsl 1
-首先进入微软的功能选项，这里可以通过windows搜索进入。找到"适用于Linux的Windows子系统"这个选项，打上勾。
+首先进入微软的功能选项，这里可以通过windows搜索进入。找到`适用于Linux的Windows子系统`这个选项，打上勾。
 
 ![打开wsl](img/open_wsl.png)
 
 这一步也可以通过powerhell打开(注意管理员权限)：
-```
+```powershell
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
 ```
 之后进入微软的应用商店
@@ -31,16 +30,16 @@ Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-L
 之后出现问题的可以看下微软的[链接](https://docs.microsoft.com/zh-cn/windows/wsl/install-win10#for-anniversary-update-and-creators-update-install-using-lxrun)。
 ### wsl 2
 如果想要开启功能，在wsl的基础上再打开虚拟机就可以，或者命令行：
-```
+```powershell
 Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform
 Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Windows-Subsystem-Linux
 ```
 然后把某个版本切换到wsl2，Ubuntu可以换成其他版本。
-```
+```powershell
 wsl --set-version Ubuntu 2
 ```
 如果版本不够，会得到命令无法识别的输出
-```C++
+```
 命令行选项无效: --set-version
 ```
 ## 进入wsl
@@ -54,17 +53,17 @@ wsl --set-version Ubuntu 2
 之前的版本建议先下载Linux发行版，之后安装Terminal，否则可能会导致新装的识别不出来，你自己还要去找GUID，新版没这个问题了，Linux发行版安装的时候会自己把东西加到Terminal里面。
 
 （怎么最近巨硬一点都不像开源公敌。。各种真香软件）由于是巨硬家的软件，所以在复制快捷键上面和windows特别相似，但是又有点不同。
-+ 复制Ctrl+shift+v
-+ 黏贴Ctrl+shift+c
-+ Ctrl+shift+数字打开某一个终端，具体是哪一个可以看下拉菜单
-+ 可以定制自己的快捷键和颜色主题(这个打开下拉菜单自己看，用的次数不多就没记快捷键，不过应该和VSCode一样是Ctrl+,)
++ 复制`Ctrl+shift+v`
++ 黏贴`Ctrl+shift+c`
++ `Ctrl+shift+数字`打开某一个终端，具体是哪一个可以看下拉菜单
++ 可以定制自己的快捷键和颜色主题(这个打开下拉菜单自己看，用的次数不多就没记快捷键，不过应该和VSCode一样是`Ctrl+,`)
 ### 软件源
 进入之后就和Ubuntu没啥差异了(我安装的Ubuntu)，我参考的这个[vampire](https://os.vampire.rip/speedup.html)的链接进行配置，在这里也感谢这个教程给我安装qemu提供了巨大的支持，也感谢对于6.828的中文翻译。
 ```shell
 sudo vi /etc/apt/sources.list
 ```
 不放心的可以备份一下，打开以后敲一下i进入插入模式，然后把所有的注释掉，换成那里的其中一个就行，最好不要把很多都搞在一起，有可能会引发软件包名称冲突的问题。之后
-```shell
+```Shell
 sudo apt-get update
 sudo apt-get upgrade
 ```
@@ -84,7 +83,7 @@ AcceptFilter http none
 > mysql-server和mysql-client必须同时安装，先后安装会导致很神奇的问题，看不懂系列。
 
 实际上，有mysql-8.0版本，但是在安装的时侯已出现了很神奇的bug，那个时候输入
-```
+```Shell
 sudo service mysql start
 sudo service mysqld start
 ```
@@ -93,12 +92,12 @@ sudo service mysqld start
 我只能黑人问号了，不知道重装系统之后这个问题会不会好，至少现在5.7版本用的还是挺稳的，反正也是本地用。
 
 安装之后如果不要求输入密码的话，就需要自己进入数据库改，这里就推荐这些了：
-```
+```Shell
 sudo service mysql stop
 sudo mysqld_safe --skip-grant-tables
 ```
 这里就会卡死，因为自我检查的最后是一个死循环，此时打开另一个窗口，运行`mysql -u root`就可以进入，之后
-```
+```mysql
 use mysql;
 select * from user;
 update user set authentication_string=password("123"),plugin="mysql_native_password" where user="root";
@@ -112,12 +111,13 @@ quit
 + 第一次密码直接回车，由phpmyadmin随机产生（也可以自己输）
 + 第二次密码也直接回车，跳过随机密码的检验（如果是自己输入的话就要一样）
 然后就可以用了。记得
-```
+```Shell
 sudo service apache2 start
 sudo service mysql start
 ```
 然后就发现欸我localhost/phpmyamdin输入地址的时候就没有反应了，咋回事啊？
 欸我这里搜不到解决方法了，如果没记错的话，把`/etc/apache2/apache2.conf`再加一行识别phpmyadmin就可以完成了。
+
 ### phpmyadmin的Warning解决
 这里的解决方法有两种
 + 下载新的phpmyadmin包，这个在[这里](https://www.phpmyadmin.net/)下载，具体内容就是覆盖，还要修改一下，怎么覆盖自己搜教程

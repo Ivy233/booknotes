@@ -6,6 +6,7 @@
 + 可能会不断修改。
 + 同时也是学习markdown。
 + all指的是当时的all。
++ [typora](https://www.typora.io/)真好用。
 
 date|range|content|finished?
 ----|-----|-------|---------
