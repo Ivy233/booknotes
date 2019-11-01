@@ -7,9 +7,12 @@
 + 同时也是学习markdown。
 + all指的是当时的all。
 + [typora](https://www.typora.io/)真好用。
++ 如果存在数学公式，会提供pdf/markdown双版本，如果没有则不提供pdf。
 
 date|range|content|finished?
 ----|-----|-------|---------
+2019-11-01 | 计算机网络(谢希仁)第七版 | 第一章修改 | finished
+2019-11-01 | 计算机网络(谢希仁)第七版 | 第二章 | finished
 2019-10-15 | 计算机网络(谢希仁)第七版, More Effective C++ | add readme.md | finished
 2019-10-15 | 计算机网络(谢希仁)第七版 | 第一章 | finished
 2019-10-14 | wsl-config | 第一版 | finished
