@@ -11,6 +11,8 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
+2019-11-05 | 计算机网络(谢希仁)第七版 | all:稍微修改下格式和bug | finished
+2019-11-05 | 编译原理-龙书第二版 | Chapter 1 | finished
 2019-11-01 | 计算机网络(谢希仁)第七版 | 第一章修改 | finished
 2019-11-01 | 计算机网络(谢希仁)第七版 | 第二章 | finished
 2019-10-15 | 计算机网络(谢希仁)第七版, More Effective C++ | add readme.md | finished
