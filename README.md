@@ -1,4 +1,5 @@
 # booknotes
+
 阅读一些经典书籍带来的一点想法。
 + 书要一本一本的看。
 + 不定期咕咕咕，但是尽可能做到每日更新（节假日除外。
@@ -11,8 +12,10 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
-2019-11-28|计算机网络(谢希仁)第七版|第四章|not finished
-2019-11-28|计算机网络(谢希仁)第七版|PPP协议替换|finished
+2020-5-15 | More-Effective-C++ | Item5-Item8 | finished
+2020-5-13 | More-Effective-C++ | Item1-Item4 | finished
+2019-11-28 | 计算机网络(谢希仁)第七版 | 第四章 | not finished
+2019-11-28 | 计算机网络(谢希仁)第七版 | PPP协议替换 | finished
 2019-11-28 | 计算机网络(谢希仁)第七版 | 第三章 | finished
 2019-11-05 | 计算机网络(谢希仁)第七版 | all:稍微修改下格式和bug | finished
 2019-11-05 | 编译原理-龙书第二版 | Chapter 1 | finished
