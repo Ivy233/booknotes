@@ -12,6 +12,7 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
+2020-5-17 | More-Effective-C++ | Item9-Item12 | finished
 2020-5-15 | More-Effective-C++ | Item5-Item8 | finished
 2020-5-13 | More-Effective-C++ | Item1-Item4 | finished
 2019-11-28 | 计算机网络(谢希仁)第七版 | 第四章 | not finished
