@@ -12,6 +12,8 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
+2020-5-21 | More-Effective-C++ | Item32-Item35 | finished
+2020-5-19 | More-Effective-C++ | Item13-Item16 | finished
 2020-5-17 | More-Effective-C++ | Item9-Item12 | finished
 2020-5-15 | More-Effective-C++ | Item5-Item8 | finished
 2020-5-13 | More-Effective-C++ | Item1-Item4 | finished
