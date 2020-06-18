@@ -217,10 +217,272 @@ delete a;
 
 ## Item 29 引用计数
 
+引用计数这个技术在C++中可以参考一下`shared_ptr`，这主要是为了解决多个对象含有一样的值的问题，毕竟少点构造就可以少点空间和时间损耗。在这个条件下，我们现在需要做的事情其实不多：存储、记录重复次数。但是这个重复次数可能会引来很多麻烦。
 
+### 引用计数的实现
+
+通常来说，我们可以为每一个对应的对象设置一个引用次数，这样可以不用为每一个对象准备空间。这样可以以一个代理类的方式放在类里面，用`private`保护起来，外面一个指针，就可以完成了。此时如果调用多次相同的构造函数，那么引用计数同样不会增多。
+
+```c++
+String s1("Hello world!");
+String s2("Hello world!");
+// 这才是在当前条件下，能达到目的的调用
+String s1("Hello world!");
+String s2 = s1;
+```
+
+同时在引入引用次数这个概念之后，我们要注意只有在次数为0的时候才可以删除该对象，相对而言在`operator=`中更容易忽视这个问题。
+
+对于刚才的“错误”调用，建议上个`map`做hash来处理。
+
+### 写时才复制
+
+在多个对象共有一块内存的时候，如果遇到了需要修改的情况，一个简单的思路是把东西拿出来，单独开一块内存，那边引用数目-1。但是在这类问题下，会遇到一个老生常谈的问题：如何判断`operator[]`的读写问题。虽然你可以保证`const`对象的`operator[]`是绝对人畜无害的，但是绝大部分情况下，你需要用没有`const`的东西，所以这种情况下，除了代理类以外，基本就是一刀切了。
+
+### 指针、引用和写时才复制
+
+刚才的问题看上去确实解决了，但是在某些新的场景下这个问题又会跑出来，比如说有个指针知道了里面去，现在要修改指针指向的内容，那么岂不是把一堆统统改掉了？这不是我们希望的效果。这个时候我们需要给原来的类中添加一个新的变量，用来标记该对象是否可以被共享，同时设定如下规则：
+
++ 默认情况下这个东西是可以被共享的，如果有个新东西进来了就+1，反之-1。
++ 如果因为`operator[]`导致可能被修改，那么将其分离的同时共享性反转。此时再有东西共享数值将会重新找一篇内存。
+
+### 引用计数基类
+
+在之前的基础上，可以考虑用一个基类来完成需要的结构，之后直接拿出来引用就行了。
+
+```c++
+class RCObject {
+public:
+    RCObject(): refCount(0), shareable(1) {}
+    RCObject(const RCObject& rhs): refCount(0), shareable(1) {}
+    RCObject& operator=(const RCObject& rhs) { return *this; }
+    virtual ~RCObject() = 0;
+    void addReference() { ++refCount; }
+    void removeReference() { if(--refCount == 0) delete this; }
+    void markUnshareable() { shareable = false; }
+    bool isShareable() const { return shareable; }
+    bool isShared() const { return refCount > 1; }
+private:
+    int refCount;
+    bool shareable;
+};
+RCObject::~RCObject() {}
+```
+
+针对这段代码有问题是很正常的一件事情，特别是针对前面三个构造方法，来看看解释：
+
++ 在大多数情况下，决定引用数应当交给程序员自己。随意预设会带来不可预料的后果，特别是同类之间和不同类之间的赋值是不一样的。
++ 仔细思考一下，把一个这玩意复制到另一个身上的时候，我们应该做什么？这不应该导致修改值，如果真的修改了，应当体现在`addReferece`和`removeReference`里面。
+
+### 后面的内容不想写了= =
+
+不过要注意一下203页开始的代码，之前的努力都放在那里了。
+
+如果想看下如何引用已有程序库的代码，建议看下209页。
 
 ## Item 30 代理类
 
+首先要注意一个问题：就是变量不可以作为数组大小，即数组的尺寸必须在编译期已知。C++甚至不支持一个与二维数组相关的堆内存分配行为。
 
+### 实现二维数组
+
+对于动态定义二维数组，除了使用`vector`套`vector`以外，还可以用一个`template`来实现。至于在这个类的构造函数里面实现什么，就不是程序本身控制的了，我们还可以进行迂回操作（比如`new`一堆出来）
+
+```c++
+template <class T>
+class Array2D
+{
+public:
+    Array2D(int dim1, int dim2);
+    // ...
+};
+```
+
+但是这会带来一个新的问题：就是我们如何找到其中的内容？比如说data\[3\]\[6\]，显然是不存在这样的`operator`的，同样的你可以通过迂回操作，用`operator()`来定义一下，但是这样会带来使用手感上的麻烦：毕竟和`int`数组是不一样的。这两个迂回操作的本质区别是：一个是在实现方法上迂回，一个是在输入方式上迂回。
+
+参考二维数组的某种理解方式，一个二维数组由一系列一维数组组成，而每一个一维数组都有固定数目的元素。那么如果我们以代理类的方式，实现类似的“一维数组”来顶替`operator[]`的结果，再在里面实现一个`operator[]`返回真正的int。
+
+### 区分`operator[]`的读写动作
+
+`operator[]`可以用于读写两个用途，在我们的期望下，读取不应该修改内容，而写入应当修改内容。在引用计数的情况下，修改内容应当引发引用计数的修改和新对象的产生。但是实际上不论是否用`const`识别，都会默认使用后一种，这是因为`const`是对于对象是否是`const`，而不是其行为是否是`const`。
+
+所以新增一个代理类来顶替结果，在代理类内通过`operator`的类型转换和复制函数来区分左右值的运用，这个问题就解决了。
+
+```c++
+class String {
+public:
+    class CharProxy {
+    public:
+        CharProxy(String& str, int index);
+        CharProxy& operator=(const CharProxy& rhs) {
+            if(theString.value->isShared())
+                theString.value = new StringValue(theString.value->data);
+            theString.value->data[charIndex] = rhs.theString.value->data[rhs.charIndex];
+            return *this;
+        }
+        CharProxy& operator=(char c) {
+            if(theString.value->isShared())
+                theString.value = new StringValue(theString.value->data);
+            theString.value->data[charIndex] = c;
+            return *this;
+        }
+        operator char() const { return theString.value->data[charIndex]; }
+    private:
+        String& theString;
+        int CharIndex;
+    };
+    const CharProxy operator[](int index) const {
+        return CharProxy(const_cast<String&>(*this), index);
+    }
+    CharProxy operator[](int index) {
+        return CharProxy(*this, index);
+    }
+    friend class CharProxy;
+private:
+    RCPtr<String> value;
+};
+```
+
+### 限制
+
+代理类可以做到两件事情：一个是剥离我们的对象和进行的操作，将之具象化；另一个是关闭其他的操作途径，只允许已经定义过的内容。在第二点的要求下，直接对原内容取指就会编译不通过。主要有两个东西：没有`operator&`和转换无法完成。
+
+所以直接定义一下不就可以了？在`const`版本中，我们直接拿出来，因为这不会影响是否共享；在非`const`版本中，应当和修改一样操作，因为你不能保证现在或者未来是否会被修改，而这类修改将会导致结构本身不自洽。
+
+在对象处理上，这类方法同样有所限制。如果我们直接对数组进行套用，那么会导致你拿到的是一个代理类，本身是没有对应函数可供调用的，于是编译失败。除此以外，因为本身返回不是一个引用，这玩意在要求对应reference参数的函数中无法运作。这一切在剥离之后，你都要重新进行实现，这基本是不可承受的代价，因为每一个东西都要重新定义；也会有相当多的好处：至少能看到更多的编译错误。
+
+### 评估
+
+代理类能帮助我们做到一些事情。
+
++ 多维数组。
++ 左值右值的区分。
++ 压抑隐式转换。
+
+也同时你需要付出一些代价。
+
++ 代理类是一种临时对象，需要被产生和被销毁。
++ 代理类增加了系统的复杂度，使其产品更难被维护。
++ `class`语义本身的改变，因为代理类把和真实对象合作改成了与替身对象合作。
 
 ## Item 31 让函数根据一个以上的对象类型来决定如何虚化
+
+这可能是一个头疼的问题，你要是说想还是想不到，但是居然还能经常遇到。
+
+```c++
+class GameObject {}；
+class SpaceShip: public GameObject {};
+class SpaceStation: public GameObject {};
+class Asteroid: public GameObject {};
+```
+
+于是挑战出来了，你如何实现这几个东西之间的碰撞？众所周知的是我们可以写九个函数分别处理，但是这傻不傻？好像有点，这简直就是浪费动态类型这个特点。于是你很容易就能写出一个入口函数，里面有个调用，然后就很尴尬地发现，这个调用并没有剖开整个问题，只是作为一个外界入口比较好。
+
+### 虚函数+RTTI
+
+我们可以让父类带一个纯虚函数，交给子类去实现，通过动态类型来决定调用者的类型；在里面进行不同类型的识别，于是乎就会产生这样的场面：
+
+```c++
+class GameObject {
+    // ...
+    virtual void collide(GameObject& otherObject) = 0;
+};
+class SpaceShip: public GameObject {
+    // ...
+    virtual void collide(GameObject& otherObject) {
+        const type_info& objtype = typeid(otherObject);
+        if(objtype == typeid(SpaceShip)) { /*...*/ }
+        else if(objtype == typeid(SpaceStation)) { /*...*/ }
+        else if(objtype == typeid(Asteroid)) { /*...*/ }
+        else {}// Exception
+    }
+};
+```
+
+这样子实现看起来挺不错的，就是有一个不大不小的问题：你不知道什么时候会加一个新的类，那个时候就超级尴尬了。在那种条件下，可能别人对于这个需求漠不关心，但是你需要对你的代码作出适当的修改，但是所有人都不得不对于新的需求要修改和重新编译一遍，这都是时间。
+
+### 只使用虚函数
+
+如果我们只是用虚函数的话，那么接下来的应该就是一个滑稽场面：每一个类都要有对于四个的调用方法，当然里面有些简单的可以直接反过来调用就可以。
+
+这个方法的问题和之前其实差不多，就是在不停的修改时意味着所有人都要不停编译，而且看着不难受么。
+
+### 自行仿真虚函数表格
+
+我们考虑这样做：
+
+```c++
+class GameObject {
+public:
+    virtual void collide(GameObject& rhs) = 0;
+    // ...
+};
+class SpaceShip: public GameObject {
+private:
+    typedef void (SpaceShip::*HitFunction)(GameObject&);
+    static HitFunction lookup(const GameObject& x);
+    typedef map<string, HitFunction> HitMap;
+public:
+    virtual void collide(GameObject& rhs);
+    virtual void hitSpaceShip(SpaceShip& rhs);
+    virtual void hitSpaceStation(SpaceStation& rhs);
+    virtual void hitAsteroid(Asteroid& rhs);
+};
+```
+
+然后再`collide`里面调用另外三个即可。
+
+```c++
+void SpaceShip::collide(GameObject& rhs) {
+    HitFunction hfp = lookup(rhs);
+    if(hfp) (this->*hfp)(rhs);
+    else throw();
+}
+```
+
+其中`lookup`函数放了一个`map`，在这里面建立一个`class`和函数之间的关系。
+
+```c++
+SpaceShip::HitFunction SpaceShip::initializeCollisionMap() {
+    // ...
+}
+SpaceShip::HitFunction SpaceShip::lookup(const GameObject& x) {
+    static HitMap G = initializeCollisionMap();
+    HitMap::iterator it = G.find(typeid(x).name());
+    if(it == G.end()) return 0;
+    return it->second; // (*it).second
+}
+```
+
+在初始化的时候就会发现一个问题：传入参数都不一样，这会直接导致`map`的键值对写不进去。
+
+### 将自行仿真的虚函数表格初始化
+
+刚才的讨论是基于已经有这张表的基础上进行的操作，现在讨论的是如何把这个表建立成我们想要的样子，同时针对这个过程可能会对使用方法有所修改。在这个表的初始化过程中，我们需要插入三个键值对，未来可能会插入更多。从函数的返回值来看，我们需要针对这个`map`进行复制以便转移，可以直接返回指针来避免这个问题：
+
+```c++
+SpaceShip::HitFunction SpaceShip::initializeCollisionMap() {
+    // ...
+}
+SpaceShip::HitFunction SpaceShip::lookup(const GameObject& x) {
+    static auto_ptr<HitMap> G(initializeCollisionMap());
+    HitMap::iterator it = G.find(typeid(x).name());
+    if(it == G.end()) return 0;
+    return it->second; // (*it).second
+}
+```
+
+在指针的条件下就会有刚才的问题出现：函数指针会因为传入参数不对而写不进去。这样的解决办法是修改成对应的函数参数，并且在对应的处理中加入`dynamic_cast`。至少一个动态转型要比`reinterpret_cast`要好得多，后者可是有点欺骗编译器的行为，反而有可能会害了自己，前者还会在转型不成功的时候扔异常出来。
+
+### 使用“非成员函数”的碰撞处理函数
+
+这个方法看上去如此花里胡哨的，下一个方法把所有方法拿了出来，直接放在一个`namespace`里面。然后`map`要修改成`map<pair<string, string>, HitFunction>`，其他的操作方式做出适当修改就可以完成。
+
+### “继承”+“自行仿真的虚函数表格”
+
+如果我们在其中丰富继承树的树枝，那么会得到一个更奇葩的情况：就是原来的函数不可以使用了。在原来的实现中，我们会使用动态类型的字符串作为输入，但是在从`map`中拿到准确函数的时候会要求函数名必须准确，于是编译出错。在这种情况下就真的没什么办法了，只能重新编译一下。
+
+### 将自行仿真的虚函数表格初始化（再度讨论）
+
+这个体系还是不很灵活：除了撞击这个动作之外，我们似乎无法添加更多的内容。这个时候就需要对`map`重新包装，利用`static`和`private`化的构造函数来确定唯一的方法管理数据库进行实现。
+
