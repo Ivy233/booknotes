@@ -12,7 +12,8 @@
 
 date|range|content|finished?
 ----|-----|-------|---------
-2020-6-18 | 计算机网络(谢希仁)第七版 | 第二章重新修改 | finished
+2020-6-28 | 计算机网络(谢希仁)第七版 | 第三章重新修改 | finished
+2020-6-27 | 计算机网络(谢希仁)第七版 | 第二章重新修改 | finished
 2020-6-26 | 计算机网络(谢希仁)第七版 | 第一章重新修改 | finished
 2020-6-18 | More-Effective-C++ | Item21-Item31 | finished
 2020-5-23 | More-Effective-C++ | Item17-Item20 | finished
