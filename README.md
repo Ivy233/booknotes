@@ -7,6 +7,7 @@
 + 可能会不断修改。
 + 同时也是学习markdown。
 + all指的是当时的all。
++ 如果出现大规模问题，不会删除，因为这是当时的理解。会直接开一个repo进行细化和扩展。
 + [typora](https://www.typora.io/)真好用。
 + 提供pdf/markdown双版本。
 
