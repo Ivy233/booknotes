@@ -1,14 +1,14 @@
+<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="知识共享许可协议" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" /></a>
+
+本作品采用<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">知识共享署名-相同方式共享 4.0 国际许可协议</a>进行许可。
+
 # booknotes
 
-阅读一些经典书籍带来的一点想法。
-+ 书要一本一本的看。
-+ 不定期咕咕咕，但是尽可能做到每日更新（节假日除外。
-+ 用自己的话阐述内容。
-+ 可能会不断修改。
-+ 同时也是学习markdown。
-+ all指的是当时的all。
-+ 如果出现大规模问题，不会删除，因为这是当时的理解。会直接开一个repo进行细化和扩展。
-+ [typora](https://www.typora.io/)真好用。
+这里记录了阅读一些经典书籍产生的读书笔记。
+
++ 会尽力使用自己的话来阐述内容，同时因为极有可能犯错，所以可能会不断修改。
++ 如果出现限于书本本身的问题，包括因内容排布导致的理解问题，或者讲解的内容过少，不会删除这些内容。但是会极有可能开一个repo进行扩展和细化。
++ 所处的不同时期带来的空闲时间和学习重心不同，必然会导致断更。但是一旦开始更新，至少能保证正在看的这本书结束。
 + 提供pdf/markdown双版本。
 
 date|range|content|finished?
